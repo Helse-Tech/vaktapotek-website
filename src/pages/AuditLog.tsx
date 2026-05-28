@@ -14,86 +14,23 @@ import {
   SectionHeader,
 } from "../components";
 import {
-  actionLabel,
+  actionLabelFor,
   downloadCsv,
   fmtDateTime,
   fmtLogDetails,
-  LOG_CATEGORY_FOR,
+  logCategoryFor,
   printPage,
 } from "../helpers";
 import { useApp } from "../store";
-import type { ActionType } from "../types";
 
-const CATEGORIES: { key: string; label: string; types: ActionType[] }[] = [
-  { key: "all", label: "Alle", types: [] },
-  {
-    key: "auth",
-    label: "Pålogging",
-    types: ["LOGIN", "LOGOUT", "AUTO_LOGOUT"],
-  },
-  {
-    key: "disp",
-    label: "Uttak",
-    types: [
-      "DISPENSE",
-      "DISPENSE_SIGN_1",
-      "DISPENSE_SIGN_2",
-      "DISPENSE_POSTPONE_SIGN_2",
-      "DISPENSE_UNDO",
-      "DISPENSE_UNREVERSED",
-    ],
-  },
-  {
-    key: "stock",
-    label: "Lager",
-    types: [
-      "DELIVERY_RECEIPT",
-      "DELIVERY_DEVIATION",
-      "DELIVERY_PHOTO",
-      "INVENTORY_EDIT",
-      "BATCH_EDIT",
-      "BATCH_DELETE",
-      "MIXTURE_OPENED",
-      "COUNT_DISCREPANCY",
-      "COUNT_CORRECTION",
-    ],
-  },
-  {
-    key: "waste",
-    label: "Svinn",
-    types: [
-      "WASTE_REGISTRATION",
-      "WASTE_UNDO",
-      "WASTE_POSTPONE_SIGN_2",
-      "WASTE_COUNT_SKIPPED",
-      "WASTE_COUNT_DISCREPANCY",
-    ],
-  },
-  {
-    key: "alert",
-    label: "Varsler",
-    types: [
-      "ALERT_CREATED",
-      "ALERT_RESOLVED",
-      "ALERT_ESCALATED",
-      "ALERT_UNRESOLVED",
-      "ALERT_DEESCALATED",
-    ],
-  },
-  {
-    key: "admin",
-    label: "Admin",
-    types: [
-      "EMPLOYEE_CREATED",
-      "NFC_CARD_REGISTERED",
-      "SETTINGS_CHANGED",
-      "ADMIN_VIEW",
-      "ADMIN_EDIT",
-      "API_CONFIGURED",
-      "EMERGENCY_MODE_ON",
-      "EMERGENCY_MODE_OFF",
-    ],
-  },
+const CATEGORIES: { key: string; label: string }[] = [
+  { key: "all", label: "Alle" },
+  { key: "auth", label: "Pålogging" },
+  { key: "disp", label: "Uttak" },
+  { key: "stock", label: "Lager" },
+  { key: "waste", label: "Svinn" },
+  { key: "alert", label: "Varsler" },
+  { key: "admin", label: "Admin" },
 ];
 
 export default function AuditLogPage() {
@@ -108,14 +45,15 @@ export default function AuditLogPage() {
   const data = useMemo(() => {
     let rows = list.data ?? [];
     if (cat !== "all") {
-      // Bruk sentral mapping så ingen handling havner under feil kategori
-      rows = rows.filter((r) => LOG_CATEGORY_FOR[r.actionType] === cat);
+      // Bruk sentral mapping (pakker log.action ut først) så ingen handling
+      // havner under feil kategori.
+      rows = rows.filter((r) => logCategoryFor(r) === cat);
     }
     if (q.trim()) {
       const term = q.toLowerCase();
       rows = rows.filter(
         (r) =>
-          actionLabel(r.actionType).toLowerCase().includes(term) ||
+          actionLabelFor(r).toLowerCase().includes(term) ||
           r.actionType.toLowerCase().includes(term) ||
           r.userId.includes(term) ||
           (r.medicineId ?? "").includes(term) ||
@@ -141,7 +79,7 @@ export default function AuditLogPage() {
                   `revisjonslogg-${range.from.slice(0, 10)}_${range.to.slice(0, 10)}`,
                   data.map((r) => ({
                     Tid: fmtDateTime(r.timestamp),
-                    Handling: actionLabel(r.actionType),
+                    Handling: actionLabelFor(r),
                     "Ansatt-#": r.userId,
                     "Medisin-ID": r.medicineId ?? "",
                     Detaljer: fmtLogDetails(r.details),
@@ -201,11 +139,11 @@ export default function AuditLogPage() {
           {
             key: "action",
             header: "Handling",
-            sortValue: (r) => actionLabel(r.actionType),
+            sortValue: (r) => actionLabelFor(r),
             width: "240px",
             render: (r) => (
               <span className="text-bodyMedium text-text">
-                {actionLabel(r.actionType)}
+                {actionLabelFor(r)}
               </span>
             ),
           },

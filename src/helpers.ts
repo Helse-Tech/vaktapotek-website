@@ -407,7 +407,13 @@ export function uid(): string {
 }
 
 // ─── Lesbare navn på revisjonslogg-handlinger ─────────────────────
+// Vi får TO former for action_type i loggen:
+//   1) UPPERCASE-konstanter (admin-nettsidens egne logger): "DISPENSE_UNDO" osv.
+//   2) Dotted-events fra mobilappen: "auth.login", "dispensing.create" osv.
+//   3) "log.action" — wrapper-event som har den ekte handlingen
+//      inne i payload.actionType. effectiveActionType() pakker den ut.
 const ACTION_LABELS: Record<string, string> = {
+  // UPPERCASE-konstanter
   LOGIN: "Logget inn",
   LOGOUT: "Logget ut",
   AUTO_LOGOUT: "Logget ut automatisk",
@@ -444,16 +450,70 @@ const ACTION_LABELS: Record<string, string> = {
   EMERGENCY_MODE_OFF: "Nødmodus slått av",
   ADMIN_VIEW: "Admin viste data",
   ADMIN_EDIT: "Admin endret data",
+  DELIVERY_EDIT: "Leveranse endret",
+
+  // Dotted events fra mobilappen
+  "auth.login": "Logget inn",
+  "auth.logout": "Logget ut",
+  "auth.auto_logout": "Logget ut automatisk",
+  "dispensing.create": "Uttak gjennomført",
+  "dispensing.undo": "Uttak reversert",
+  "dispensing.sign_2": "Uttak ettersignert",
+  "dispensing.postpone_sign_2": "Andresignering utsatt",
+  "waste.create": "Svinn registrert",
+  "waste.undo": "Svinn reversert",
+  "inventory.upsert": "Lager oppdatert",
+  "inventory.edit": "Lager endret",
+  "delivery.create": "Vareleveranse mottatt",
+  "delivery.photo": "Bilde av pakkseddel lagt til",
+  "delivery.deviation": "Avvik på vareleveranse",
+  "alert.create": "Varsel opprettet",
+  "alert.resolve": "Varsel markert som løst",
+  "alert.escalate": "Varsel eskalert",
+  "nfc.register": "NFC-kort registrert",
+  "nfc.unregister": "NFC-kort fjernet",
+  "user.create": "Ansatt opprettet",
+  "user.update": "Ansatt endret",
+  "user.delete": "Ansatt deaktivert",
+  "user.password": "Passord endret",
+  "admin.signature_verify": "Signatur verifisert",
+  "system.heartbeat": "Appen sjekket inn",
+  "log.action": "Hendelse",
 };
 
+/**
+ * Hvis loggen er en log.action-wrapper, returner den ekte actionType-en
+ * fra payload (UPPERCASE). Ellers returner det opprinnelige feltet.
+ */
+export function effectiveActionType(log: {
+  actionType: string;
+  details?: Record<string, any> | null;
+}): string {
+  if (log.actionType === "log.action" && log.details?.actionType) {
+    return String(log.details.actionType);
+  }
+  return log.actionType;
+}
+
+function prettifyRawType(type: string): string {
+  // "system.heartbeat" → "System heartbeat"
+  // "DISPENSE_UNDO" → "Dispense undo"
+  return type
+    .replace(/[._]/g, " ")
+    .toLowerCase()
+    .replace(/^./, (c) => c.toUpperCase());
+}
+
 export function actionLabel(type: ActionType | string): string {
-  return (
-    ACTION_LABELS[type] ??
-    type
-      .toLowerCase()
-      .replace(/_/g, " ")
-      .replace(/^./, (c) => c.toUpperCase())
-  );
+  return ACTION_LABELS[type] ?? prettifyRawType(type);
+}
+
+/** Brukes til "Handling"-kolonnen — pakker log.action ut først. */
+export function actionLabelFor(log: {
+  actionType: string;
+  details?: Record<string, any> | null;
+}): string {
+  return actionLabel(effectiveActionType(log));
 }
 
 // ─── Lesbare navn på detalj-nøkler ────────────────────────────────
@@ -512,35 +572,66 @@ export function fmtLogDetails(details: Record<string, any> | null | undefined): 
 }
 
 // ─── Tilbakemap: hvilken kategori hører en handling til? ───────────
+// Dekker BÅDE UPPERCASE-konstanter OG dotted-events. Bruk
+// logCategoryFor(log) for korrekt kategorisering (pakker log.action ut).
 export const LOG_CATEGORY_FOR: Record<string, string> = {
+  // ── Pålogging ──
   LOGIN: "auth",
   LOGOUT: "auth",
   AUTO_LOGOUT: "auth",
+  "auth.login": "auth",
+  "auth.logout": "auth",
+  "auth.auto_logout": "auth",
+
+  // ── Uttak ──
   DISPENSE: "disp",
   DISPENSE_SIGN_1: "disp",
   DISPENSE_SIGN_2: "disp",
   DISPENSE_POSTPONE_SIGN_2: "disp",
   DISPENSE_UNDO: "disp",
   DISPENSE_UNREVERSED: "disp",
+  "dispensing.create": "disp",
+  "dispensing.undo": "disp",
+  "dispensing.sign_2": "disp",
+  "dispensing.postpone_sign_2": "disp",
+
+  // ── Lager (inkl. leveranser og inventar) ──
   DELIVERY_RECEIPT: "stock",
   DELIVERY_DEVIATION: "stock",
   DELIVERY_PHOTO: "stock",
+  DELIVERY_EDIT: "stock",
   INVENTORY_EDIT: "stock",
   BATCH_EDIT: "stock",
   BATCH_DELETE: "stock",
   MIXTURE_OPENED: "stock",
   COUNT_DISCREPANCY: "stock",
   COUNT_CORRECTION: "stock",
+  "delivery.create": "stock",
+  "delivery.photo": "stock",
+  "delivery.deviation": "stock",
+  "inventory.upsert": "stock",
+  "inventory.edit": "stock",
+
+  // ── Svinn ──
   WASTE_REGISTRATION: "waste",
   WASTE_UNDO: "waste",
   WASTE_POSTPONE_SIGN_2: "waste",
   WASTE_COUNT_SKIPPED: "waste",
   WASTE_COUNT_DISCREPANCY: "waste",
+  "waste.create": "waste",
+  "waste.undo": "waste",
+
+  // ── Varsler ──
   ALERT_CREATED: "alert",
   ALERT_RESOLVED: "alert",
   ALERT_ESCALATED: "alert",
   ALERT_UNRESOLVED: "alert",
   ALERT_DEESCALATED: "alert",
+  "alert.create": "alert",
+  "alert.resolve": "alert",
+  "alert.escalate": "alert",
+
+  // ── Admin ──
   EMPLOYEE_CREATED: "admin",
   NFC_CARD_REGISTERED: "admin",
   SETTINGS_CHANGED: "admin",
@@ -549,4 +640,22 @@ export const LOG_CATEGORY_FOR: Record<string, string> = {
   EMERGENCY_MODE_OFF: "admin",
   ADMIN_VIEW: "admin",
   ADMIN_EDIT: "admin",
+  "user.create": "admin",
+  "user.update": "admin",
+  "user.delete": "admin",
+  "user.password": "admin",
+  "nfc.register": "admin",
+  "nfc.unregister": "admin",
+  "admin.signature_verify": "admin",
+  "system.heartbeat": "admin",
 };
+
+/** Returnerer kategori (auth/disp/stock/waste/alert/admin) for et logg-element,
+ * og pakker log.action ut først så LOGIN o.l. havner i Pålogging. */
+export function logCategoryFor(log: {
+  actionType: string;
+  details?: Record<string, any> | null;
+}): string | undefined {
+  const eff = effectiveActionType(log);
+  return LOG_CATEGORY_FOR[eff] ?? LOG_CATEGORY_FOR[log.actionType];
+}

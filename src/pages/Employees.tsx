@@ -145,6 +145,17 @@ export default function EmployeesPage() {
     onError: (e: any) => toast.error(e?.message ?? "Kunne ikke registrere"),
   });
 
+  const unregisterNfc = useMutation({
+    mutationFn: (uid: string) => api.nfc.unregister(uid),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["users"] });
+      toast.success("NFC-kort fjernet");
+      setNfcMode(null);
+      setNfcUid("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Kunne ikke fjerne"),
+  });
+
   const startWebNfc = async () => {
     if (!("NDEFReader" in window)) {
       toast.message(
@@ -253,6 +264,16 @@ export default function EmployeesPage() {
                     <div className="text-caption text-muted">
                       #{u.employeeNumber}
                     </div>
+                    <div className="text-captionSmall text-muted mt-0.5 flex items-center gap-1">
+                      <IdCard size={12} />
+                      {u.nfcCardUid ? (
+                        <span className="font-mono break-all">
+                          {u.nfcCardUid}
+                        </span>
+                      ) : (
+                        <span className="italic">Ingen NFC-kort</span>
+                      )}
+                    </div>
                   </div>
                   <RoleBadge role={u.role} />
                 </div>
@@ -281,10 +302,10 @@ export default function EmployeesPage() {
                     iconLeft={IdCard}
                     onClick={() => {
                       setNfcMode(u);
-                      setNfcUid("");
+                      setNfcUid(u.nfcCardUid ?? "");
                     }}
                   >
-                    NFC-kort
+                    {u.nfcCardUid ? "Endre NFC" : "NFC-kort"}
                   </Button>
                   <Button
                     size="sm"
@@ -426,12 +447,30 @@ export default function EmployeesPage() {
           setNfcMode(null);
           setNfcUid("");
         }}
-        title="Registrer NFC-kort"
+        title={nfcMode?.nfcCardUid ? "Endre NFC-kort" : "Registrer NFC-kort"}
         description={
           nfcMode ? `For ${nfcMode.name} (#${nfcMode.employeeNumber})` : ""
         }
         footer={
           <>
+            {nfcMode?.nfcCardUid && (
+              <Button
+                variant="danger"
+                loading={unregisterNfc.isPending}
+                onClick={() =>
+                  openConfirm({
+                    title: "Fjern NFC-kort?",
+                    message: `Kortet ${nfcMode.nfcCardUid} vil ikke lenger kunne brukes til pålogging.`,
+                    confirmLabel: "Fjern",
+                    danger: true,
+                    onConfirm: () =>
+                      unregisterNfc.mutate(nfcMode.nfcCardUid!),
+                  })
+                }
+              >
+                Fjern kort
+              </Button>
+            )}
             <Button
               variant="ghost"
               onClick={() => {
@@ -443,7 +482,9 @@ export default function EmployeesPage() {
             </Button>
             <Button
               loading={registerNfc.isPending}
-              disabled={!nfcUid.trim()}
+              disabled={
+                !nfcUid.trim() || nfcUid.trim() === nfcMode?.nfcCardUid
+              }
               onClick={() => registerNfc.mutate()}
             >
               Lagre kort

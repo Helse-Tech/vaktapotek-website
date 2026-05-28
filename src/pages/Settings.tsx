@@ -28,8 +28,8 @@ export default function SettingsPage() {
     autoLogoutMinutes: number;
     lowStockThresholdDefault: number;
     expirationWarningDays: number;
-    postponedDoubleSignMinutes: number;
-    countDiscrepancyMinutes: number;
+    postponedDoubleSignHours: number;
+    countDiscrepancyHours: number;
     requireDeliveryPhoto: boolean;
     cPrepRequiresPatientId: boolean;
     enableNfc: boolean;
@@ -42,10 +42,15 @@ export default function SettingsPage() {
         autoLogoutMinutes: cfg.data.autoLogoutMinutes,
         lowStockThresholdDefault: cfg.data.lowStockThresholdDefault,
         expirationWarningDays: cfg.data.expirationWarningDays,
-        postponedDoubleSignMinutes:
-          cfg.data.alertDeadlines.postponedDoubleSignMinutes,
-        countDiscrepancyMinutes:
-          cfg.data.alertDeadlines.countDiscrepancyMinutes,
+        // Konverter lagrede minutter til timer for visning
+        postponedDoubleSignHours: Math.max(
+          1,
+          Math.round(cfg.data.alertDeadlines.postponedDoubleSignMinutes / 60),
+        ),
+        countDiscrepancyHours: Math.max(
+          1,
+          Math.round(cfg.data.alertDeadlines.countDiscrepancyMinutes / 60),
+        ),
         requireDeliveryPhoto: cfg.data.features.requireDeliveryPhoto,
         cPrepRequiresPatientId: cfg.data.features.cPrepRequiresPatientId,
         enableNfc: cfg.data.features.enableNfc,
@@ -62,8 +67,9 @@ export default function SettingsPage() {
         expirationWarningDays: form!.expirationWarningDays,
         alertDeadlines: {
           ...cfg.data!.alertDeadlines,
-          postponedDoubleSignMinutes: form!.postponedDoubleSignMinutes,
-          countDiscrepancyMinutes: form!.countDiscrepancyMinutes,
+          // Lagres fortsatt som minutter på server (RemoteConfig-typen)
+          postponedDoubleSignMinutes: form!.postponedDoubleSignHours * 60,
+          countDiscrepancyMinutes: form!.countDiscrepancyHours * 60,
         },
         features: {
           ...cfg.data!.features,
@@ -157,27 +163,27 @@ export default function SettingsPage() {
             subtitle="Hvor lenge før varslene eskaleres til admin"
           />
           <Input
-            label="Utsatt dobbelsign — frist (minutter)"
+            label="Utsatt dobbelsign — frist (timer)"
             type="number"
             min={1}
-            value={form.postponedDoubleSignMinutes}
+            value={form.postponedDoubleSignHours}
             onChange={(e) =>
               setForm({
                 ...form,
-                postponedDoubleSignMinutes: Number(e.target.value),
+                postponedDoubleSignHours: Number(e.target.value),
               })
             }
             containerClassName="mb-3"
           />
           <Input
-            label="Telleavvik — frist (minutter)"
+            label="Telleavvik — frist (timer)"
             type="number"
             min={1}
-            value={form.countDiscrepancyMinutes}
+            value={form.countDiscrepancyHours}
             onChange={(e) =>
               setForm({
                 ...form,
-                countDiscrepancyMinutes: Number(e.target.value),
+                countDiscrepancyHours: Number(e.target.value),
               })
             }
           />

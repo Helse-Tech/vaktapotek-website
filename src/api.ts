@@ -319,6 +319,28 @@ export const api = {
       http<DeliveryReceipt[]>(
         `/deliveries${from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : ""}`,
       ),
+    updateItem: (
+      deliveryId: string,
+      itemId: string,
+      patch: {
+        quantity?: number;
+        batchNumber?: string;
+        expirationDate?: string;
+      },
+    ) =>
+      http(
+        `/deliveries/${encodeURIComponent(deliveryId)}/items/${encodeURIComponent(itemId)}`,
+        { method: "PUT", body: patch },
+      ),
+    updateDeviation: (
+      deliveryId: string,
+      deviationId: string,
+      patch: { description?: string; type?: string },
+    ) =>
+      http(
+        `/deliveries/${encodeURIComponent(deliveryId)}/deviations/${encodeURIComponent(deviationId)}`,
+        { method: "PUT", body: patch },
+      ),
   },
 
   // Varsler
