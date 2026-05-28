@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Edit, Save } from "lucide-react";
+import { Save } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -42,11 +42,15 @@ export default function InventoryDetailPage() {
 
   const [threshold, setThreshold] = useState("");
   const [desired, setDesired] = useState("");
+  const [total, setTotal] = useState("");
+  const [unopened, setUnopened] = useState("");
 
   useEffect(() => {
     if (item) {
       setThreshold(String(item.lowStockThreshold));
       setDesired(item.desiredStock ? String(item.desiredStock) : "");
+      setTotal(String(inventoryTotalUnits(item)));
+      setUnopened(String(item.unopenedPackages));
     }
   }, [item]);
 
@@ -70,6 +74,41 @@ export default function InventoryDetailPage() {
     onError: (e: any) => toast.error(e?.message ?? "Kunne ikke lagre"),
   });
 
+  // Beregn opened ut fra ny "På lager" (total). Når admin endrer total,
+  // skal "Igjen i åpnet" oppdateres automatisk. Uåpnede pakker holdes likt.
+  const computedOpened = useMemo(() => {
+    if (!item) return 0;
+    if (item.isUnitOnly) return 0;
+    const t = Number(total) || 0;
+    const u = Number(unopened) || 0;
+    const upp = item.unitsPerPackage || 1;
+    return Math.max(0, t - u * upp);
+  }, [item, total, unopened]);
+
+  const saveStock = useMutation({
+    mutationFn: () => {
+      if (!item) throw new Error("Mangler medisin");
+      const u = Math.max(0, Number(unopened) || 0);
+      if (item.isUnitOnly) {
+        // Telles som hele enheter: total = unopenedPackages
+        const t = Math.max(0, Number(total) || 0);
+        return api.inventory.setStock(item.id, {
+          unopenedPackages: t,
+          openedContainerRemaining: 0,
+        });
+      }
+      return api.inventory.setStock(item.id, {
+        unopenedPackages: u,
+        openedContainerRemaining: computedOpened,
+      });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      toast.success("Beholdning oppdatert");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Kunne ikke lagre"),
+  });
+
   if (inv.isLoading) return <Loader label="Henter lager…" />;
   if (!item)
     return (
@@ -79,7 +118,7 @@ export default function InventoryDetailPage() {
       />
     );
 
-  const total = inventoryTotalUnits(item);
+  const currentTotal = inventoryTotalUnits(item);
   return (
     <>
       <PageHeader title={item.medicineName} back subtitle={item.nameFormStrength} />
@@ -94,10 +133,10 @@ export default function InventoryDetailPage() {
             <Card padded className="bg-primary-soft border-0">
               <div className="text-caption text-primary">På lager</div>
               <div className="text-h1 font-bold text-primary tabular-nums">
-                {fmtInt(total)}
+                {fmtInt(currentTotal)}
               </div>
               <div className="text-caption text-primary">
-                {unitLabel(item, total)}
+                {unitLabel(item, currentTotal)}
               </div>
             </Card>
             <Card padded className="bg-surface">
@@ -172,11 +211,59 @@ export default function InventoryDetailPage() {
                     </li>
                   );
                 })}
-            </ul>
+              </ul>
           )}
         </Card>
 
         <div className="space-y-4">
+          {/* ── ADMIN: rediger beholdning ─────────────────── */}
+          <Card>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-h3">Rediger beholdning</h3>
+              <HelpTip text="Admin kan justere både «På lager» og «Uåpnede pakker» manuelt. «Igjen i åpnet» beregnes automatisk når du endrer «På lager»." />
+            </div>
+            <div className="space-y-3">
+              <Input
+                label={`På lager (${unitLabel(item, 2)})`}
+                type="number"
+                inputMode="numeric"
+                value={total}
+                onChange={(e) => setTotal(e.target.value)}
+                hint={
+                  item.isUnitOnly
+                    ? "Telles som hele enheter"
+                    : `${unopened || 0} uåpnede × ${item.unitsPerPackage || 1} + igjen i åpnet = total`
+                }
+              />
+              <Input
+                label="Uåpnede pakker"
+                type="number"
+                inputMode="numeric"
+                value={unopened}
+                onChange={(e) => setUnopened(e.target.value)}
+                disabled={item.isUnitOnly}
+              />
+              {!item.isUnitOnly && (
+                <div className="rounded-md bg-surface border border-border px-3 py-2">
+                  <div className="text-caption text-muted">
+                    Igjen i åpnet (beregnes automatisk)
+                  </div>
+                  <div className="text-h3 text-text tabular-nums">
+                    {fmtInt(computedOpened)}
+                  </div>
+                </div>
+              )}
+              <Button
+                iconLeft={Save}
+                loading={saveStock.isPending}
+                onClick={() => saveStock.mutate()}
+                fullWidth
+              >
+                Lagre beholdning
+              </Button>
+            </div>
+          </Card>
+
           <Card>
             <div className="flex items-center gap-2 mb-2">
               <h3 className="text-h3">Lav-terskel</h3>

@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Printer, Undo2 } from "lucide-react";
+import { Download, Printer, Redo2, Undo2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,7 +17,7 @@ import {
   SectionHeader,
   StatusPill,
 } from "../components";
-import { downloadCsv, fmtDateTime, fmtInt, printPage } from "../helpers";
+import { downloadCsv, fmtDate, fmtDateTime, fmtInt, printPage } from "../helpers";
 import { useApp } from "../store";
 import type { DispensingRecord } from "../types";
 
@@ -34,6 +34,7 @@ export default function DispensingsPage() {
     "all",
   );
   const [reversing, setReversing] = useState<DispensingRecord | null>(null);
+  const [unreversing, setUnreversing] = useState<DispensingRecord | null>(null);
   const [reason, setReason] = useState("");
 
   const data = useMemo(() => {
@@ -65,6 +66,18 @@ export default function DispensingsPage() {
       setReason("");
     },
     onError: (e: any) => toast.error(e?.message ?? "Kunne ikke reversere"),
+  });
+
+  const unreverse = useMutation({
+    mutationFn: () =>
+      api.dispensings.unreverse(unreversing!.id, reason || "Admin-omreversering"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["dispensings"] });
+      toast.success("Reversering angret — uttaket er aktivt igjen");
+      setUnreversing(null);
+      setReason("");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Kunne ikke omreversere"),
   });
 
   const exportCsv = () =>
@@ -182,7 +195,18 @@ export default function DispensingsPage() {
           {
             key: "patient",
             header: "Pasient",
-            render: (r) => r.patientInitials || "—",
+            render: (r) => (
+              <div className="leading-tight">
+                <div className="text-bodyMedium text-text">
+                  {r.patientInitials || "—"}
+                </div>
+                {r.dob && (
+                  <div className="text-captionSmall text-muted">
+                    f. {fmtDate(r.dob)}
+                  </div>
+                )}
+              </div>
+            ),
           },
           {
             key: "signer",
@@ -212,7 +236,19 @@ export default function DispensingsPage() {
             header: "",
             noPrint: true,
             render: (r) =>
-              !r.reversedAt && (
+              r.reversedAt ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  iconLeft={Redo2}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setUnreversing(r);
+                  }}
+                >
+                  Omreverser
+                </Button>
+              ) : (
                 <Button
                   size="sm"
                   variant="ghost"
@@ -231,12 +267,21 @@ export default function DispensingsPage() {
 
       <Modal
         open={!!reversing}
-        onClose={() => setReversing(null)}
+        onClose={() => {
+          setReversing(null);
+          setReason("");
+        }}
         title="Reverser uttak"
         description="Lageret legges tilbake og hendelsen logges. Krever begrunnelse."
         footer={
           <>
-            <Button variant="ghost" onClick={() => setReversing(null)}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setReversing(null);
+                setReason("");
+              }}
+            >
               Avbryt
             </Button>
             <Button
@@ -268,6 +313,64 @@ export default function DispensingsPage() {
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="Hvorfor reverseres uttaket?"
+            />
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Omreverser (angre reversering) ───────────── */}
+      <Modal
+        open={!!unreversing}
+        onClose={() => {
+          setUnreversing(null);
+          setReason("");
+        }}
+        title="Omreverser uttak"
+        description="Uttaket blir aktivt igjen og lageret trekkes på nytt. Krever begrunnelse."
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setUnreversing(null);
+                setReason("");
+              }}
+            >
+              Avbryt
+            </Button>
+            <Button
+              loading={unreverse.isPending}
+              onClick={() => unreverse.mutate()}
+              disabled={reason.trim().length < 3}
+            >
+              Bekreft omreversering
+            </Button>
+          </>
+        }
+      >
+        {unreversing && (
+          <div className="space-y-3">
+            <div className="bg-surface p-3 rounded-md">
+              <div className="text-bodyMedium">{unreversing.medicineName}</div>
+              <div className="text-caption text-muted">
+                {fmtInt(unreversing.amount)} {unreversing.amountUnit} ·{" "}
+                {fmtDateTime(unreversing.dispensedAt)}
+              </div>
+              {unreversing.reversalReason && (
+                <div className="text-caption text-muted mt-1">
+                  Opprinnelig begrunnelse: {unreversing.reversalReason}
+                </div>
+              )}
+            </div>
+            <label className="text-label text-text font-medium">
+              Begrunnelse for omreversering
+            </label>
+            <textarea
+              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-body text-text focus:border-primary focus:ring-2 focus:ring-primary/15 outline-none"
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Hvorfor angres reverseringen?"
             />
           </div>
         )}

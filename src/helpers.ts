@@ -22,6 +22,7 @@ import {
 import { nb } from "date-fns/locale";
 
 import type {
+  ActionType,
   DateRange,
   DateRangePreset,
   InventoryItem,
@@ -404,3 +405,148 @@ export function printPage(title?: string) {
 export function uid(): string {
   return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
 }
+
+// ─── Lesbare navn på revisjonslogg-handlinger ─────────────────────
+const ACTION_LABELS: Record<string, string> = {
+  LOGIN: "Logget inn",
+  LOGOUT: "Logget ut",
+  AUTO_LOGOUT: "Logget ut automatisk",
+  DISPENSE: "Uttak gjennomført",
+  DISPENSE_SIGN_1: "Uttak signert (første)",
+  DISPENSE_SIGN_2: "Uttak signert (andre)",
+  DISPENSE_POSTPONE_SIGN_2: "Andresignering utsatt",
+  DISPENSE_UNDO: "Uttak reversert",
+  DELIVERY_RECEIPT: "Vareleveranse mottatt",
+  DELIVERY_DEVIATION: "Avvik på vareleveranse",
+  DELIVERY_PHOTO: "Bilde av pakkseddel lagt til",
+  INVENTORY_EDIT: "Lager endret",
+  BATCH_EDIT: "Batch endret",
+  BATCH_DELETE: "Batch slettet",
+  MIXTURE_OPENED: "Mikstur åpnet",
+  COUNT_DISCREPANCY: "Telleavvik oppdaget",
+  COUNT_CORRECTION: "Telling korrigert",
+  WASTE_REGISTRATION: "Svinn registrert",
+  WASTE_UNDO: "Svinn reversert",
+  WASTE_POSTPONE_SIGN_2: "Andresignering utsatt (svinn)",
+  WASTE_COUNT_SKIPPED: "Telling hoppet over (svinn)",
+  WASTE_COUNT_DISCREPANCY: "Telleavvik (svinn)",
+  ALERT_CREATED: "Varsel opprettet",
+  ALERT_RESOLVED: "Varsel markert som løst",
+  ALERT_ESCALATED: "Varsel eskalert",
+  ALERT_UNRESOLVED: "Varsel gjenåpnet",
+  ALERT_DEESCALATED: "Varsel de-eskalert",
+  DISPENSE_UNREVERSED: "Reversering angret",
+  NFC_CARD_REGISTERED: "NFC-kort registrert",
+  EMPLOYEE_CREATED: "Ansatt opprettet",
+  SETTINGS_CHANGED: "Innstillinger endret",
+  API_CONFIGURED: "API konfigurert",
+  EMERGENCY_MODE_ON: "Nødmodus slått på",
+  EMERGENCY_MODE_OFF: "Nødmodus slått av",
+  ADMIN_VIEW: "Admin viste data",
+  ADMIN_EDIT: "Admin endret data",
+};
+
+export function actionLabel(type: ActionType | string): string {
+  return (
+    ACTION_LABELS[type] ??
+    type
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .replace(/^./, (c) => c.toUpperCase())
+  );
+}
+
+// ─── Lesbare navn på detalj-nøkler ────────────────────────────────
+const DETAIL_KEY_LABELS: Record<string, string> = {
+  id: "ID",
+  type: "Type",
+  reason: "Begrunnelse",
+  value: "Verdi",
+  emp: "Ansatt",
+  employeeNumber: "Ansattnummer",
+  role: "Rolle",
+  medicineId: "Medisin-ID",
+  threshold: "Terskel",
+  desired: "Ønsket beholdning",
+  unopenedPackages: "Uåpnede pakker",
+  openedContainerRemaining: "Igjen i åpnet",
+  lowStockThreshold: "Lav-terskel",
+  desiredStock: "Ønsket beholdning",
+  amount: "Mengde",
+  amountUnit: "Enhet",
+  patientInitials: "Pasient",
+  dob: "Fødselsdato",
+  password_reset: "Passord nullstilt",
+  user_active: "Bruker-status",
+  user: "Bruker",
+  batchNumber: "Batch",
+  expirationDate: "Utløpsdato",
+  count: "Antall",
+};
+
+function labelForDetailKey(k: string): string {
+  return DETAIL_KEY_LABELS[k] ?? k.replace(/([A-Z])/g, " $1").toLowerCase().replace(/^./, c => c.toUpperCase());
+}
+
+function formatDetailValue(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "boolean") return v ? "Ja" : "Nei";
+  if (typeof v === "number" || typeof v === "string") return String(v);
+  if (Array.isArray(v)) return v.map(formatDetailValue).join(", ");
+  if (typeof v === "object") {
+    return Object.entries(v as Record<string, unknown>)
+      .map(([k, vv]) => `${labelForDetailKey(k)}: ${formatDetailValue(vv)}`)
+      .join(", ");
+  }
+  return String(v);
+}
+
+/** Render the JSON details column of an audit log as readable Norwegian text. */
+export function fmtLogDetails(details: Record<string, any> | null | undefined): string {
+  if (!details || typeof details !== "object" || Object.keys(details).length === 0) {
+    return "—";
+  }
+  return Object.entries(details)
+    .map(([k, v]) => `${labelForDetailKey(k)}: ${formatDetailValue(v)}`)
+    .join(" · ");
+}
+
+// ─── Tilbakemap: hvilken kategori hører en handling til? ───────────
+export const LOG_CATEGORY_FOR: Record<string, string> = {
+  LOGIN: "auth",
+  LOGOUT: "auth",
+  AUTO_LOGOUT: "auth",
+  DISPENSE: "disp",
+  DISPENSE_SIGN_1: "disp",
+  DISPENSE_SIGN_2: "disp",
+  DISPENSE_POSTPONE_SIGN_2: "disp",
+  DISPENSE_UNDO: "disp",
+  DISPENSE_UNREVERSED: "disp",
+  DELIVERY_RECEIPT: "stock",
+  DELIVERY_DEVIATION: "stock",
+  DELIVERY_PHOTO: "stock",
+  INVENTORY_EDIT: "stock",
+  BATCH_EDIT: "stock",
+  BATCH_DELETE: "stock",
+  MIXTURE_OPENED: "stock",
+  COUNT_DISCREPANCY: "stock",
+  COUNT_CORRECTION: "stock",
+  WASTE_REGISTRATION: "waste",
+  WASTE_UNDO: "waste",
+  WASTE_POSTPONE_SIGN_2: "waste",
+  WASTE_COUNT_SKIPPED: "waste",
+  WASTE_COUNT_DISCREPANCY: "waste",
+  ALERT_CREATED: "alert",
+  ALERT_RESOLVED: "alert",
+  ALERT_ESCALATED: "alert",
+  ALERT_UNRESOLVED: "alert",
+  ALERT_DEESCALATED: "alert",
+  EMPLOYEE_CREATED: "admin",
+  NFC_CARD_REGISTERED: "admin",
+  SETTINGS_CHANGED: "admin",
+  API_CONFIGURED: "admin",
+  EMERGENCY_MODE_ON: "admin",
+  EMERGENCY_MODE_OFF: "admin",
+  ADMIN_VIEW: "admin",
+  ADMIN_EDIT: "admin",
+};

@@ -13,7 +13,14 @@ import {
   SearchBar,
   SectionHeader,
 } from "../components";
-import { downloadCsv, fmtDateTime, printPage } from "../helpers";
+import {
+  actionLabel,
+  downloadCsv,
+  fmtDateTime,
+  fmtLogDetails,
+  LOG_CATEGORY_FOR,
+  printPage,
+} from "../helpers";
 import { useApp } from "../store";
 import type { ActionType } from "../types";
 
@@ -33,6 +40,7 @@ const CATEGORIES: { key: string; label: string; types: ActionType[] }[] = [
       "DISPENSE_SIGN_2",
       "DISPENSE_POSTPONE_SIGN_2",
       "DISPENSE_UNDO",
+      "DISPENSE_UNREVERSED",
     ],
   },
   {
@@ -46,9 +54,21 @@ const CATEGORIES: { key: string; label: string; types: ActionType[] }[] = [
       "BATCH_EDIT",
       "BATCH_DELETE",
       "MIXTURE_OPENED",
+      "COUNT_DISCREPANCY",
+      "COUNT_CORRECTION",
     ],
   },
-  { key: "waste", label: "Svinn", types: ["WASTE_REGISTRATION", "WASTE_UNDO"] },
+  {
+    key: "waste",
+    label: "Svinn",
+    types: [
+      "WASTE_REGISTRATION",
+      "WASTE_UNDO",
+      "WASTE_POSTPONE_SIGN_2",
+      "WASTE_COUNT_SKIPPED",
+      "WASTE_COUNT_DISCREPANCY",
+    ],
+  },
   {
     key: "alert",
     label: "Varsler",
@@ -56,8 +76,8 @@ const CATEGORIES: { key: string; label: string; types: ActionType[] }[] = [
       "ALERT_CREATED",
       "ALERT_RESOLVED",
       "ALERT_ESCALATED",
-      "COUNT_DISCREPANCY",
-      "COUNT_CORRECTION",
+      "ALERT_UNRESOLVED",
+      "ALERT_DEESCALATED",
     ],
   },
   {
@@ -69,6 +89,9 @@ const CATEGORIES: { key: string; label: string; types: ActionType[] }[] = [
       "SETTINGS_CHANGED",
       "ADMIN_VIEW",
       "ADMIN_EDIT",
+      "API_CONFIGURED",
+      "EMERGENCY_MODE_ON",
+      "EMERGENCY_MODE_OFF",
     ],
   },
 ];
@@ -84,16 +107,19 @@ export default function AuditLogPage() {
 
   const data = useMemo(() => {
     let rows = list.data ?? [];
-    const c = CATEGORIES.find((x) => x.key === cat);
-    if (c && c.types.length > 0)
-      rows = rows.filter((r) => c.types.includes(r.actionType));
+    if (cat !== "all") {
+      // Bruk sentral mapping så ingen handling havner under feil kategori
+      rows = rows.filter((r) => LOG_CATEGORY_FOR[r.actionType] === cat);
+    }
     if (q.trim()) {
       const term = q.toLowerCase();
       rows = rows.filter(
         (r) =>
+          actionLabel(r.actionType).toLowerCase().includes(term) ||
           r.actionType.toLowerCase().includes(term) ||
           r.userId.includes(term) ||
-          (r.medicineId ?? "").includes(term),
+          (r.medicineId ?? "").includes(term) ||
+          fmtLogDetails(r.details).toLowerCase().includes(term),
       );
     }
     return rows;
@@ -115,10 +141,10 @@ export default function AuditLogPage() {
                   `revisjonslogg-${range.from.slice(0, 10)}_${range.to.slice(0, 10)}`,
                   data.map((r) => ({
                     Tid: fmtDateTime(r.timestamp),
-                    Handling: r.actionType,
+                    Handling: actionLabel(r.actionType),
                     "Ansatt-#": r.userId,
                     "Medisin-ID": r.medicineId ?? "",
-                    Detaljer: JSON.stringify(r.details),
+                    Detaljer: fmtLogDetails(r.details),
                   })),
                 )
               }
@@ -151,7 +177,7 @@ export default function AuditLogPage() {
         <SearchBar
           value={q}
           onChange={setQ}
-          placeholder="Søk på handling, ansattnr eller medisin-ID…"
+          placeholder="Søk på handling, ansattnr eller medisin…"
         />
       </Card>
 
@@ -165,8 +191,9 @@ export default function AuditLogPage() {
             key: "time",
             header: "Tid",
             sortValue: (r) => r.timestamp,
+            width: "180px",
             render: (r) => (
-              <span className="text-caption text-muted">
+              <span className="text-caption text-muted whitespace-nowrap">
                 {fmtDateTime(r.timestamp)}
               </span>
             ),
@@ -174,23 +201,29 @@ export default function AuditLogPage() {
           {
             key: "action",
             header: "Handling",
-            sortValue: (r) => r.actionType,
+            sortValue: (r) => actionLabel(r.actionType),
+            width: "240px",
             render: (r) => (
-              <span className="text-bodyMedium text-text">{r.actionType}</span>
+              <span className="text-bodyMedium text-text">
+                {actionLabel(r.actionType)}
+              </span>
             ),
           },
           {
             key: "user",
             header: "Ansatt",
-            render: (r) => `#${r.userId}`,
+            width: "100px",
+            render: (r) => (
+              <span className="whitespace-nowrap">#{r.userId}</span>
+            ),
           },
           {
             key: "details",
             header: "Detaljer",
             render: (r) => (
-              <code className="text-captionSmall text-muted break-all">
-                {JSON.stringify(r.details).slice(0, 120)}
-              </code>
+              <span className="text-caption text-text break-words whitespace-normal block">
+                {fmtLogDetails(r.details)}
+              </span>
             ),
           },
         ]}

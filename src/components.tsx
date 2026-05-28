@@ -1024,7 +1024,7 @@ export function CommandPalette() {
   return (
     <Modal open={open} onClose={() => setOpen(false)} size="md">
       <div className="-mx-6 -my-5">
-        <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+        <div className="px-4 py-3 pr-14 border-b border-border flex items-center gap-2">
           <Icon icon={Search} size={18} className="text-muted" />
           <input
             autoFocus

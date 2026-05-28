@@ -232,7 +232,10 @@ export type ActionType =
   | "BATCH_EDIT"
   | "MIXTURE_OPENED"
   | "ADMIN_VIEW"
-  | "ADMIN_EDIT";
+  | "ADMIN_EDIT"
+  | "ALERT_UNRESOLVED"
+  | "ALERT_DEESCALATED"
+  | "DISPENSE_UNREVERSED";
 
 export interface ActionLog {
   id: string;

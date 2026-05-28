@@ -172,17 +172,23 @@ export default function EmployeesPage() {
       toast.error("Navn og ansattnummer er påkrevd");
       return;
     }
+    const emp = editing.employeeNumber.trim();
     if (!editing.id) {
+      // Ansattnummer må være minst 6 sifre, kun tall.
+      // (Server-siden i vaktapotek-bridge.php håndhever samme regel + global unikhet
+      // på tvers av alle legevakter.)
+      if (!/^\d{6,}$/.test(emp)) {
+        toast.error("Ansattnummer må være minst 6 sifre (kun tall)");
+        return;
+      }
       if (editing.password.length < 6) {
         toast.error("Passord må være minst 6 tegn");
         return;
       }
-      if (
-        (list.data ?? []).some(
-          (u) => u.employeeNumber === editing.employeeNumber.trim(),
-        )
-      ) {
-        toast.error("Ansattnummer er allerede i bruk");
+      if ((list.data ?? []).some((u) => u.employeeNumber === emp)) {
+        toast.error(
+          "Ansattnummer er allerede i bruk — det må være unikt på tvers av alle legevakter",
+        );
         return;
       }
       create.mutate(editing);
@@ -345,15 +351,22 @@ export default function EmployeesPage() {
             />
             <Input
               label="Ansattnummer"
-              placeholder="1001"
+              placeholder="100001"
               inputMode="numeric"
+              pattern="\d*"
               value={editing.employeeNumber}
               onChange={(e) =>
-                setEditing({ ...editing, employeeNumber: e.target.value })
+                setEditing({
+                  ...editing,
+                  // Tillat kun sifre i inntastingen
+                  employeeNumber: e.target.value.replace(/\D/g, ""),
+                })
               }
               disabled={!!editing.id}
               hint={
-                editing.id ? "Ansattnummer kan ikke endres" : "Må være unikt"
+                editing.id
+                  ? "Ansattnummer kan ikke endres"
+                  : "Minst 6 sifre · unikt på tvers av alle legevakter"
               }
             />
             <PasswordInput

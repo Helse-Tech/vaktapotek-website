@@ -274,6 +274,17 @@ export const api = {
         method: "PUT",
         body: { desiredStock: desired },
       }),
+    setStock: (
+      id: string,
+      payload: {
+        unopenedPackages: number;
+        openedContainerRemaining: number;
+      },
+    ) =>
+      http(`/inventory/${id}/stock`, {
+        method: "PUT",
+        body: payload,
+      }),
   },
 
   // Uttak
@@ -284,6 +295,11 @@ export const api = {
       ),
     reverse: (id: string, reason: string) =>
       http(`/dispensings/${id}/reverse`, {
+        method: "POST",
+        body: { reason },
+      }),
+    unreverse: (id: string, reason: string) =>
+      http(`/dispensings/${id}/unreverse`, {
         method: "POST",
         body: { reason },
       }),
@@ -311,6 +327,10 @@ export const api = {
     resolve: (id: string) => http(`/alerts/${id}/resolve`, { method: "POST" }),
     escalate: (id: string) =>
       http(`/alerts/${id}/escalate`, { method: "POST" }),
+    unresolve: (id: string) =>
+      http(`/alerts/${id}/unresolve`, { method: "POST" }),
+    deescalate: (id: string) =>
+      http(`/alerts/${id}/deescalate`, { method: "POST" }),
   },
 
   // Action-log
