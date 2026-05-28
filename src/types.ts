@@ -125,6 +125,11 @@ export interface WasteRecord {
   createdAt: string;
   reversedAt?: string;
   reversedBy?: string;
+  reversalReason?: string;
+  note?: string;
+  createdByAdmin?: boolean;
+  lastEditedAt?: string;
+  lastEditedBy?: string;
 }
 
 export interface DeliveryItem {

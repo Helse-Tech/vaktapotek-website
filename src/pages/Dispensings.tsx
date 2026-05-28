@@ -61,7 +61,8 @@ export default function DispensingsPage() {
       api.dispensings.reverse(reversing!.id, reason || "Admin-reversal"),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dispensings"] });
-      toast.success("Uttak reversert");
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      toast.success("Uttak reversert — beholdning lagt tilbake i lager");
       setReversing(null);
       setReason("");
     },
@@ -73,7 +74,8 @@ export default function DispensingsPage() {
       api.dispensings.unreverse(unreversing!.id, reason || "Admin-omreversering"),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["dispensings"] });
-      toast.success("Reversering angret — uttaket er aktivt igjen");
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      toast.success("Reversering angret — uttaket er aktivt igjen, lager trukket");
       setUnreversing(null);
       setReason("");
     },

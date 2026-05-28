@@ -311,6 +311,30 @@ export const api = {
       http<WasteRecord[]>(
         `/waste${from && to ? `?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}` : ""}`,
       ),
+    create: (payload: {
+      medicineId: string;
+      amount: number;
+      amountUnit?: string;
+      note?: string;
+    }) => http<WasteRecord>("/waste", { method: "POST", body: payload }),
+    update: (
+      id: string,
+      patch: { amount?: number; amountUnit?: string; note?: string },
+    ) =>
+      http(`/waste/${encodeURIComponent(id)}`, {
+        method: "PUT",
+        body: patch,
+      }),
+    reverse: (id: string, reason: string) =>
+      http(`/waste/${encodeURIComponent(id)}/reverse`, {
+        method: "POST",
+        body: { reason },
+      }),
+    unreverse: (id: string, reason: string) =>
+      http(`/waste/${encodeURIComponent(id)}/unreverse`, {
+        method: "POST",
+        body: { reason },
+      }),
   },
 
   // Leveranser
